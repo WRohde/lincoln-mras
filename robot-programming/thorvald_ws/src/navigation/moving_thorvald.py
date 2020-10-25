@@ -16,6 +16,29 @@ class move_and_avoid:
         self.sub = rospy.Subscriber("/thorvald_001/scan", LaserScan, self.laserscan_subscriber_callback)
         self.min_distance = min_distance
         self.avoidance_angle = avoidance_angle
+        self.detected_collisions = {"left":False,"right":False,"forward":False}
+
+    def __call__(self):      
+        print(self.detected_collisions)
+        # if there are collisions detected in front stop. Otherwise move forwards
+        if self.detected_collisions["forward"]:
+            speed = 0
+        else:
+            speed = 1
+
+        #collisions on the left, free on the right so turn right.   
+        if self.detected_collisions["left"] and not self.detected_collisions["right"]: 
+            rotational_speed = -1.5708
+        #collisions on the right, free on the left so turn left
+        elif not self.detected_collisions["left"] and self.detected_collisions["right"]: 
+            rotational_speed = 1.5708
+        #collisions in all directions, turn on the spot until a free direction is found.
+        elif self.detected_collisions["left"] and self.detected_collisions["right"] and self.detected_collisions["forward"]:
+            rotational_speed = 1.5708
+        else:
+            rotational_speed = 0
+
+        self.publish_cmd_vel(speed=speed, rotational_speed=rotational_speed)
 
     def laserscan_subscriber_callback(self,data):
         """
@@ -25,35 +48,37 @@ class move_and_avoid:
         For the Thorvald Robot the laserscanner is positioned so that it sweeps from -pi/2 to pi/2
         """
 
+        # ranges from the laserscan data are sampled in a sector avoidance_angle wide
         num_ranges_to_sample = int(self.avoidance_angle / data.angle_increment)
-    
         sampled_ranges = data.ranges[int((len(data.ranges) -  num_ranges_to_sample)/2):int((len(data.ranges) +  num_ranges_to_sample)/2)]
-        self.check_collisions(sampled_ranges,data.range_min) 
+        self.check_collisions(sampled_ranges)
     
-    def check_collisions(self,sampled_ranges,range_min):
+    def check_collisions(self,sampled_ranges):
         # the array of sampled ranges is split into left and right sides
         collisions = np.array(sampled_ranges) < self.min_distance 
-        right_collisions = collisions[:int(len(collisions)/2)]
-        left_collisions = collisions[int(len(collisions)/2):]
+        detected_collisions = {"left":False,"right":False,"forward":False}
 
-        if(np.sum(left_collisions) > np.sum(right_collisions)): # more collisions to the left so turn right
-            self.publish_cmd_vel(ang=[0,0,-1.5708])  
-        elif(np.sum(left_collisions) < np.sum(right_collisions)): #more collisions to the right so turn left
-            self.publish_cmd_vel(ang=[0,0,1.5708])
-        else: #keep going forwards
-            self.publish_cmd_vel(lin=[1,0,0])
+        #check for collisions on the right
+        if np.sum(collisions[:int(len(collisions)/4)]) > 0:
+            detected_collisions["left"]=True
 
-    def publish_cmd_vel(self,lin=[0,0,0],ang=[0,0,0]):
+        #check for collisions in front
+        if np.sum(collisions[int(len(collisions)/4):int(len(collisions)*3/4)]) > 0:
+            detected_collisions["front"]=True
+
+        #check for collisions on the left
+        if np.sum(collisions[int(len(collisions)*3/4):]) > 0:
+            detected_collisions["right"]=True
+
+        self.detected_collisions = detected_collisions
+
+    def publish_cmd_vel(self,speed=0,rotational_speed=0):
         message = Twist()
-        message.linear.x = lin[0]
-        message.linear.y = lin[1]
-        message.linear.z = lin[2]
-        message.angular.x = ang[0]
-        message.angular.y = ang[1]
-        message.angular.z = ang[2]
+        message.linear.x = speed
+        message.angular.z = rotational_speed
         self.pub.publish(message)
 
 move_and_avoid = move_and_avoid("moving_thorvald")
 
 while not rospy.is_shutdown():
-    rospy.sleep(0.01)
+    move_and_avoid()
