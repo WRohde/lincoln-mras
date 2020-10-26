@@ -6,7 +6,7 @@ from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
 
 class move_and_avoid:
-    def __init__(self,node_name,min_distance=3,avoidance_angle=0.7854):
+    def __init__(self,node_name,min_distance=5,avoidance_angle=0.7854,forward_speed=0.5):
         """
         min_distance is the minimum distance between the robot and an obstacle before it turns to avoid.
         avoidance_angle is the angle of the sector where collisions are checked.
@@ -17,6 +17,7 @@ class move_and_avoid:
         self.min_distance = min_distance
         self.avoidance_angle = avoidance_angle
         self.detected_collisions = {"left":False,"right":False,"forward":False}
+        self.forward_speed = forward_speed
 
     def __call__(self):      
         print(self.detected_collisions)
@@ -24,7 +25,7 @@ class move_and_avoid:
         if self.detected_collisions["forward"]:
             speed = 0
         else:
-            speed = 1
+            speed = self.forward_speed
 
         #collisions on the left, free on the right so turn right.   
         if self.detected_collisions["left"] and not self.detected_collisions["right"]: 
@@ -62,9 +63,9 @@ class move_and_avoid:
         if np.sum(collisions[:int(len(collisions)/4)]) > 0:
             detected_collisions["left"]=True
 
-        #check for collisions in front
+        #check for collisions in forward
         if np.sum(collisions[int(len(collisions)/4):int(len(collisions)*3/4)]) > 0:
-            detected_collisions["front"]=True
+            detected_collisions["forward"]=True
 
         #check for collisions on the left
         if np.sum(collisions[int(len(collisions)*3/4):]) > 0:
