@@ -19,25 +19,32 @@ class move_and_avoid:
         self.detected_collisions = {"left":False,"right":False,"forward":False}
         self.forward_speed = forward_speed
 
-    def __call__(self):      
-        print(self.detected_collisions)
+    def __call__(self):
+        """
+        When called this function will move the robot forwards at self.forward_speed unless
+        a collision is detected. The logic is based on the content of the dict 
+        self.detected_collsions which should have a boolean value for the directions forward,
+        left, and right.        
+        """      
+        rotational_speed = 0
         # if there are collisions detected in front stop. Otherwise move forwards
         if self.detected_collisions["forward"]:
             speed = 0
         else:
             speed = self.forward_speed
 
+        #collisions in all directions, turn on the spot until a free direction is found.
+        if self.detected_collisions["left"] and self.detected_collisions["right"] and self.detected_collisions["forward"]:
+            print("collisions in all directions, turning left")
+            rotational_speed = 1.5708
         #collisions on the left, free on the right so turn right.   
-        if self.detected_collisions["left"] and not self.detected_collisions["right"]: 
+        if self.detected_collisions["left"] and not self.detected_collisions["right"]:
+            print("collisions on the left, clear on the right. Turning right") 
             rotational_speed = -1.5708
         #collisions on the right, free on the left so turn left
-        elif not self.detected_collisions["left"] and self.detected_collisions["right"]: 
+        if not self.detected_collisions["left"] and self.detected_collisions["right"]: 
+            print("collisions on the righ, clear on the left. Turning left") 
             rotational_speed = 1.5708
-        #collisions in all directions, turn on the spot until a free direction is found.
-        elif self.detected_collisions["left"] and self.detected_collisions["right"] and self.detected_collisions["forward"]:
-            rotational_speed = 1.5708
-        else:
-            rotational_speed = 0
 
         self.publish_cmd_vel(speed=speed, rotational_speed=rotational_speed)
 
@@ -83,3 +90,4 @@ move_and_avoid = move_and_avoid("moving_thorvald")
 
 while not rospy.is_shutdown():
     move_and_avoid()
+    rospy.sleep(0.1)
