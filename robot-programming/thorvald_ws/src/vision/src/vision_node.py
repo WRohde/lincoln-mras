@@ -20,26 +20,23 @@ class image_converter:
             cv_image = self.bridge.imgmsg_to_cv2(data,"bgr8")
         except CvBridgeError as e:
             print(e)
+        
+        #boundaries checking for green values between 70 and 255
+        lower_green = np.array([0,70,0],dtype='uint8')
+        upper_green = np.array([255,255,255],dtype='uint8')
 
-        (rows,cols,channels) = cv_image.shape
-        if cols > 60 and rows > 60 :
-            cv2.circle(cv_image, (50,50), 10, 255)
-
-        cv2.waitKey(3)
+        mask = cv2.inRange(cv_image,lower_green,upper_green)
+        output = cv2.bitwise_and(cv_image, cv_image, mask = mask)
 
         try:
-          self.image_pub.publish(self.bridge.cv2_to_imgmsg(cv_image, "bgr8"))
+          self.image_pub.publish(self.bridge.cv2_to_imgmsg(output, "bgr8"))
         except CvBridgeError as e:
             print(e)
 
-def main(args):
-  ic = image_converter()
-  rospy.init_node('image_converter', anonymous=True)
-  try:
-    rospy.spin()
-  except KeyboardInterrupt:
-    print("Shutting down")
-  cv2.destroyAllWindows()
+
+
 
 if __name__ == '__main__':
-    main(sys.argv)
+    ic = image_converter()
+    rospy.init_node('image_converter', anonymous=True)
+    rospy.spin()
