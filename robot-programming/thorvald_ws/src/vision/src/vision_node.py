@@ -21,6 +21,18 @@ class image_converter:
         except CvBridgeError as e:
             print(e)
         
+        output,mask = self.green_mask(cv_image)
+
+        try:
+          self.image_pub.publish(self.bridge.cv2_to_imgmsg(output, "bgr8"))
+        except CvBridgeError as e:
+            print(e)
+    
+    def green_mask(self, cv_image):
+        """
+        masks out elements of the image that have a green value below 70.
+        returns output and mask
+        """
         #boundaries checking for green values between 70 and 255
         lower_green = np.array([0,70,0],dtype='uint8')
         upper_green = np.array([255,255,255],dtype='uint8')
@@ -28,15 +40,12 @@ class image_converter:
         mask = cv2.inRange(cv_image,lower_green,upper_green)
         output = cv2.bitwise_and(cv_image, cv_image, mask = mask)
 
-        try:
-          self.image_pub.publish(self.bridge.cv2_to_imgmsg(output, "bgr8"))
-        except CvBridgeError as e:
-            print(e)
+        return output,mask
 
 
 
 
 if __name__ == '__main__':
     ic = image_converter()
-    rospy.init_node('image_converter', anonymous=True)
+    rospy.init_node('vision_node', anonymous=True)
     rospy.spin()
