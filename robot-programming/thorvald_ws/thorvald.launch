@@ -1,4 +1,0 @@
-<launch>
-<node pkg="rviz" type="rviz" name="rviz" args="-d thorvald_rviz_config.rviz" />
-<include file="$(find uol_cmp9767m_base)/launch/thorvald-sim.launch" />
-</launch>
