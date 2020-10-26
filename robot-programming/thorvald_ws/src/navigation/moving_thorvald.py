@@ -6,7 +6,7 @@ from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
 
 class move_and_avoid:
-    def __init__(self,node_name,min_distance=5,avoidance_angle=0.7854,forward_speed=0.5):
+    def __init__(self,node_name,min_distance=5,avoidance_angle=0.7854,forward_speed=2):
         """
         min_distance is the minimum distance between the robot and an obstacle before it turns to avoid.
         avoidance_angle is the angle of the sector where collisions are checked.
@@ -27,23 +27,19 @@ class move_and_avoid:
         left, and right.        
         """      
         rotational_speed = 0
-        # if there are collisions detected in front stop. Otherwise move forwards
+        #if there are collisions detected in front stop. Otherwise move forwards
         if self.detected_collisions["forward"]:
+            #if the robot is blocked in front it has to turn on the spot. 
+            rotational_speed = 1.5708
             speed = 0
         else:
             speed = self.forward_speed
 
-        #collisions in all directions, turn on the spot until a free direction is found.
-        if self.detected_collisions["left"] and self.detected_collisions["right"] and self.detected_collisions["forward"]:
-            print("collisions in all directions, turning left")
-            rotational_speed = 1.5708
-        #collisions on the left, free on the right so turn right.   
+        #collisions detected on the left, no collisions on the right. So turn right.   
         if self.detected_collisions["left"] and not self.detected_collisions["right"]:
-            print("collisions on the left, clear on the right. Turning right") 
             rotational_speed = -1.5708
-        #collisions on the right, free on the left so turn left
-        if not self.detected_collisions["left"] and self.detected_collisions["right"]: 
-            print("collisions on the righ, clear on the left. Turning left") 
+        #collisions detected on the right, no collisions on the left. So turn left
+        if not self.detected_collisions["left"] and self.detected_collisions["right"]:
             rotational_speed = 1.5708
 
         self.publish_cmd_vel(speed=speed, rotational_speed=rotational_speed)
@@ -62,13 +58,18 @@ class move_and_avoid:
         self.check_collisions(sampled_ranges)
     
     def check_collisions(self,sampled_ranges):
+        """
+        The sampled_ranges array is split into three areas in relation to the robot: front, left, right
+        if collisions are detected in each area the entry in dict self.detected_collisions for the area 
+        is set true.
+        """
         # the array of sampled ranges is split into left and right sides
         collisions = np.array(sampled_ranges) < self.min_distance 
         detected_collisions = {"left":False,"right":False,"forward":False}
 
         #check for collisions on the right
         if np.sum(collisions[:int(len(collisions)/4)]) > 0:
-            detected_collisions["left"]=True
+            detected_collisions["right"]=True
 
         #check for collisions in forward
         if np.sum(collisions[int(len(collisions)/4):int(len(collisions)*3/4)]) > 0:
@@ -76,7 +77,7 @@ class move_and_avoid:
 
         #check for collisions on the left
         if np.sum(collisions[int(len(collisions)*3/4):]) > 0:
-            detected_collisions["right"]=True
+            detected_collisions["left"]=True
 
         self.detected_collisions = detected_collisions
 
