@@ -1,5 +1,11 @@
 <launch>
-    <include file="$(find uol_cmp9767m_base)/launch/thorvald-sim.launch" />
+    <include file="$(find uol_cmp9767m_base)/launch/thorvald-sim.launch" >
+        <arg name="second_robot" value="true"/>
+        <arg name="obstacles" value="true"/>
+        <arg name="fake_localisation" value="true"/>
+    </include>
+    
     <node pkg="rviz" type="rviz" name="rviz" args="-d thorvald_rviz_config.rviz" />
     <node pkg="vision" type="vision_node.py" name="vision_node" />
+
 </launch>

@@ -1,24 +1,32 @@
 #!/usr/bin/python
 
+import sys
 import rospy
 import numpy as np
-from geometry_msgs.msg import Twist
+from scipy.spatial.transform import Rotation
+from geometry_msgs.msg import Twist, PoseStamped
 from sensor_msgs.msg import LaserScan
 
 class move_and_avoid:
-    def __init__(self,node_name,min_distance=5,avoidance_angle=0.7854,forward_speed=2):
+    def __init__(self,robot_name,min_distance=5,avoidance_angle=0.7854,forward_speed=2,publish_closest_collision=True):
         """
+        robot_name should be in the format "thorvald_001", "thorvald_002", etc so that topics are published correctly
         min_distance is the minimum distance between the robot and an obstacle before it turns to avoid.
         avoidance_angle is the angle of the sector where collisions are checked.
         """
-        rospy.init_node(node_name)
-        self.pub = rospy.Publisher("/thorvald_001/twist_mux/cmd_vel",Twist,queue_size=0)
-        self.sub = rospy.Subscriber("/thorvald_001/scan", LaserScan, self.laserscan_subscriber_callback)
+        rospy.init_node("moving_"+robot_name,anonymous=True)
+        self.pub = rospy.Publisher("/{}/twist_mux/cmd_vel".format(robot_name),Twist,queue_size=0)
+        self.sub = rospy.Subscriber("/{}/scan".format(robot_name), LaserScan, self.laserscan_subscriber_callback)
+        self.publish_closest_collision = publish_closest_collision
+        if (self.publish_closest_collision):
+            self.closest_collision_publisher = rospy.Publisher("/{}/closest_collision".format(robot_name), PoseStamped,queue_size=0)
+
+        self.robot_name = robot_name
         self.min_distance = min_distance
         self.avoidance_angle = avoidance_angle
         self.detected_collisions = {"left":False,"right":False,"forward":False}
         self.forward_speed = forward_speed
-
+       
     def __call__(self):
         """
         When called this function will move the robot forwards at self.forward_speed unless
@@ -56,6 +64,28 @@ class move_and_avoid:
         num_ranges_to_sample = int(self.avoidance_angle / data.angle_increment)
         sampled_ranges = data.ranges[int((len(data.ranges) -  num_ranges_to_sample)/2):int((len(data.ranges) +  num_ranges_to_sample)/2)]
         self.check_collisions(sampled_ranges)
+
+        if self.publish_closest_collision:
+            #find the polar coord for the minimum distance
+            min_distance = min(data.ranges)
+            min_distance_angle = data.angle_increment * data.ranges.index(min_distance) - np.pi/2
+
+            #convert to a pose WRT /robot_name/xxxx frame
+            pose = PoseStamped()
+            pose.header.frame_id = "thorvald_001/hokuyo"
+            pose.pose.position.x = min_distance * np.cos(min_distance_angle)
+            pose.pose.position.y = min_distance * np.sin(min_distance_angle)
+            #convert angle to quaternion
+            r = Rotation.from_euler('z', min_distance_angle)
+            min_distance_quaternion = r.as_quat()
+            pose.pose.orientation.x = min_distance_quaternion[0]
+            pose.pose.orientation.y = min_distance_quaternion[1]
+            pose.pose.orientation.z = min_distance_quaternion[2]
+            pose.pose.orientation.w = min_distance_quaternion[3]
+
+            #publish pose
+            self.closest_collision_publisher.publish(pose)
+
     
     def check_collisions(self,sampled_ranges):
         """
@@ -79,7 +109,7 @@ class move_and_avoid:
         if np.sum(collisions[int(len(collisions)*3/4):]) > 0:
             detected_collisions["left"]=True
 
-        self.detected_collisions = detected_collisions
+        self.detected_collisions = detected_collisions       
 
     def publish_cmd_vel(self,speed=0,rotational_speed=0):
         message = Twist()
@@ -87,8 +117,15 @@ class move_and_avoid:
         message.angular.z = rotational_speed
         self.pub.publish(message)
 
-move_and_avoid = move_and_avoid("moving_thorvald")
+if __name__ == '__main__':
+    if(len(sys.argv)>1):
+        robot_name = sys.argv[1]
+    else:
+        robot_name = "thorvald_001"
+    
+    move_and_avoid = move_and_avoid(robot_name)
+    
+    while not rospy.is_shutdown():
+        move_and_avoid()
+        rospy.sleep(0.1)
 
-while not rospy.is_shutdown():
-    move_and_avoid()
-    rospy.sleep(0.1)
