@@ -2,7 +2,6 @@
 
 import rospy
 import numpy as np
-import sys
 import cv2
 from std_msgs.msg import String
 from sensor_msgs.msg import Image
@@ -25,6 +24,7 @@ class image_converter:
 
         try:
           self.image_pub.publish(self.bridge.cv2_to_imgmsg(output, "bgr8"))
+          cv2.imwrite("test_image.jpg",output)
         except CvBridgeError as e:
             print(e)
     
@@ -41,9 +41,7 @@ class image_converter:
         output = cv2.bitwise_and(cv_image, cv_image, mask = mask)
 
         return output,mask
-
-
-
+    
 
 if __name__ == '__main__':
     ic = image_converter()
