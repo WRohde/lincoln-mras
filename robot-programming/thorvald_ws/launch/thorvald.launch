@@ -1,4 +1,5 @@
 <launch>
     <include file="$(find uol_cmp9767m_base)/launch/thorvald-sim.launch" />
     <node pkg="rviz" type="rviz" name="rviz" args="-d thorvald_rviz_config.rviz" />
+    <node pkg="vision" type="vision_node.py" name="vision_node" />
 </launch>
