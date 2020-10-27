@@ -72,7 +72,7 @@ class move_and_avoid:
 
             #convert to a pose WRT /robot_name/xxxx frame
             pose = PoseStamped()
-            pose.header.frame_id = "thorvald_001/hokuyo"
+            pose.header.frame_id = "{}/hokuyo".format(self.robot_name)
             pose.pose.position.x = min_distance * np.cos(min_distance_angle)
             pose.pose.position.y = min_distance * np.sin(min_distance_angle)
             #convert angle to quaternion
