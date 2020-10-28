@@ -1,2 +1,8 @@
-# lincoln-mras
-This is the repo for my work during the MSc in Robotics and Autonomous Systems at Lincoln. I am going to try and keep all of my work in this one repo unless it becomes unmanageable. 
+# Robot Programming - CMP9767M
+
+This folder contains all my non-assessment work for the Robot Programming module.
+
+## Useful commands
+
+launch thorvald gazebo simulation.
+roslaunch uol_cmp9767m_base thorvald-sim.launch
