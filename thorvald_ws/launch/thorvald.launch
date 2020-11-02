@@ -1,7 +1,7 @@
 <launch>
     <include file="$(find uol_cmp9767m_base)/launch/thorvald-sim.launch" >
-        <arg name="second_robot" value="true"/>
-        <arg name="obstacles" value="true"/>
+        <arg name="second_robot" value="false"/>
+        <arg name="obstacles" value="false"/>
         <arg name="fake_localisation" value="true"/>
     </include>
     
