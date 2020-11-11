@@ -9,8 +9,8 @@ from cv_bridge import CvBridge, CvBridgeError
 
 class image_converter:
     def __init__(self, image_topic = "/thorvald_001/kinect2_camera/hd/image_color_rect"):
-        self.image_pub = rospy.Publisher("opencv_image",Image)
-        self.green_detected_pub = rospy.Publisher("green_detected",String)
+        self.image_pub = rospy.Publisher("opencv_image",Image,queue_size=0)
+        self.green_detected_pub = rospy.Publisher("green_detected",String,queue_size=0)
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber(image_topic,Image,self.callback)
 
@@ -22,9 +22,14 @@ class image_converter:
         
         output,mask = self.green_mask(cv_image)
 
+
         try:
-          self.image_pub.publish(self.bridge.cv2_to_imgmsg(output, "bgr8"))
-          cv2.imwrite("test_image.jpg",output)
+            self.image_pub.publish(self.bridge.cv2_to_imgmsg(output, "bgr8"))
+            if np.sum(mask) > 1e6: #this threshold was chosen arbitrarily
+                self.green_detected_pub.publish("TRUE")
+            else:
+                self.green_detected_pub.publish("FALSE")
+
         except CvBridgeError as e:
             print(e)
     

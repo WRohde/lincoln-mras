@@ -7,5 +7,6 @@
     
     <node pkg="rviz" type="rviz" name="rviz" args="-d thorvald_rviz_config.rviz" />
     <node pkg="vision" type="vision_node.py" name="vision_node" />
+    <node pkg="navigation" type="moving_thorvald.py" name="moving_thorvald" />
 
 </launch>
