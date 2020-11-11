@@ -64,32 +64,6 @@ class move_and_avoid:
             speed = 0
 
         self.publish_cmd_vel(speed,angular_speed)
-
-
-    def __call__(self):
-        """
-        When called this function will move the robot forwards at self.forward_speed unless
-        a collision is detected. The logic is based on the content of the dict 
-        self.detected_collsions which should have a boolean value for the directions forward,
-        left, and right.        
-        """
-        rotational_speed = 0
-        #if there are collisions detected in front stop. Otherwise move forwards
-        if self.detected_collisions["forward"]:
-            #if the robot is blocked in front it has to turn on the spot. 
-            rotational_speed = 1.5708
-            speed = 0
-        else:
-            speed = self.forward_speed
-
-        #collisions detected on the left, no collisions on the right. So turn right.   
-        if self.detected_collisions["left"] and not self.detected_collisions["right"]:
-            rotational_speed = -1.5708
-        #collisions detected on the right, no collisions on the left. So turn left
-        if not self.detected_collisions["left"] and self.detected_collisions["right"]:
-            rotational_speed = 1.5708
-
-        self.publish_cmd_vel(speed=speed, rotational_speed=rotational_speed)
     
     def odometry_subscriber_callback(self,data):
         """

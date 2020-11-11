@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import rospy
+import sys
 import numpy as np
 from geometry_msgs.msg import Point
 from std_msgs.msg import String
@@ -43,7 +44,7 @@ class StateMachine:
                 handler = self.handlers[newState.upper()]
             rospy.sleep(0.1)
 
-#greendetection subscriber and callback.
+#greendetection callback.
 green_detection = False
 def green_detection_callback(data):
     global green_detection 
@@ -52,7 +53,6 @@ def green_detection_callback(data):
         print("green_detected")
     else:
         green_detection = False 
-green_detection_sub = rospy.Subscriber("/green_detected",String,green_detection_callback)
 
 def callSprayService():
     rospy.wait_for_service('/thorvald_001/spray')
@@ -63,12 +63,16 @@ def callSprayService():
     except rospy.ServiceException, e:
         print "Service call failed: %s" % e
 
+#State machine states
 def launch(_):
     newState = 'ROAM'
     return(newState,_)
 
 def roam(_):
-    #TODO publish a random target position
+    #publish a random target position
+    target_position = Point()
+    target_position_pub.publish(target_position)
+    
     if(green_detection == True):
         newState = 'SPRAY'
     else:
@@ -91,5 +95,14 @@ thorvald_StateMachine.add_state('SPRAY',spray)
 rospy.init_node("thorvald_state_machine",anonymous=True)
 
 if __name__ == '__main__':
+    if(len(sys.argv)>1):
+        robot_name = sys.argv[1]
+    else:
+        robot_name = "thorvald_001"
+
+    green_detection_sub = rospy.Subscriber("/green_detected",String,green_detection_callback)
+    #target position publisher. The moving_thorvald node subscribes to these messages and the robot will navigate to them.
+    target_position_pub = rospy.Publisher("/{}/target_position".format(robot_name),Point,queue_size=0)
+
     thorvald_StateMachine.run("")
     

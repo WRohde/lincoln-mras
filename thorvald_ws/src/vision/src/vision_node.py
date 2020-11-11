@@ -22,7 +22,6 @@ class image_converter:
         
         output,mask = self.green_mask(cv_image)
 
-
         try:
             self.image_pub.publish(self.bridge.cv2_to_imgmsg(output, "bgr8"))
             if np.sum(mask) > 1e6: #this threshold was chosen arbitrarily
