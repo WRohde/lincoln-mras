@@ -50,14 +50,12 @@ def green_detection_callback(data):
     global green_detection 
     if(data.data =='TRUE'):
         green_detection = True
-        print("green_detected")
     else:
         green_detection = False 
 
 def callSprayService():
     rospy.wait_for_service('/thorvald_001/spray')
     try:
-        print("spray")
         callSpray = rospy.ServiceProxy('/thorvald_001/spray', Empty)
         return callSpray()
     except rospy.ServiceException, e:
@@ -97,6 +95,7 @@ rospy.init_node("thorvald_state_machine",anonymous=True)
 if __name__ == '__main__':
     if(len(sys.argv)>1):
         robot_name = sys.argv[1]
+        print(robot_name)
     else:
         robot_name = "thorvald_001"
 

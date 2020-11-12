@@ -7,8 +7,8 @@
     
     <node pkg="rviz" type="rviz" name="rviz" args="-d thorvald_rviz_config.rviz" />
     <node pkg="vision" type="vision_node.py" name="vision_node" />
-    <node pkg="navigation" type="moving_thorvald.py" name="moving_thorvald" />
-    <node pkg="state_machine" type="state_machine.py" name="state_machine" />
+    <node pkg="navigation" type="moving_thorvald.py" name="moving_thorvald" args="thorvald_001" />
+    <node pkg="state_machine" type="state_machine.py" name="state_machine" args="thorvald_001" />
 
 
 </launch>
