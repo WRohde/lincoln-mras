@@ -93,7 +93,7 @@ class move:
         self.move_status_pub.publish(self.move_status)
         self.pub.publish(cmd_vel_message)
 
-    def state_callback(data):
+    def state_callback(self,data):
         """
         Makes the state_machine state for the robot accessible to the rest of the class.
         """        

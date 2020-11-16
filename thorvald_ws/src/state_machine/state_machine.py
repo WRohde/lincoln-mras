@@ -11,7 +11,7 @@ from std_srvs.srv import Empty
 class StateMachine:
     """
     state machine class from the example here: https://www.python-course.eu/finite_state_machine.php
-    Modified for ROS
+    Modified to better fit this ROS application
     """
     def __init__(self):
         self.handlers = {}
@@ -36,9 +36,8 @@ class StateMachine:
         #    raise  InitializationError('at least one state must be an end_state')
     
         while not rospy.is_shutdown():
-            
-            state_pub.Publish(newState)
             (newState, cargo) = handler(cargo)
+            state_pub.publish(newState)
             if newState.upper() in self.endStates:
                 print('reached ', newState)
                 break 
@@ -78,7 +77,7 @@ def roam(_):
     target_position = Point()
     target_position_pub.publish(target_position)
     
-    if(False) #TODO add move_status subscriber and callback which parses for unexpected collision detection.
+    if(False): #TODO add move_status subscriber and callback which parses for unexpected collision detection.
         newState = 'PLAN'
     elif(green_detection == True):
         newState = 'GREENCLASSIFIER'
@@ -117,8 +116,6 @@ thorvald_StateMachine.add_state('ROAM',roam)
 thorvald_StateMachine.add_state('PLAN',plan)
 thorvald_StateMachine.add_state('GREENCLASSIFIER',green_classifier)
 thorvald_StateMachine.add_state('SPRAY',spray)
-
-
 
 if __name__ == '__main__':
     if(len(sys.argv)>1):
