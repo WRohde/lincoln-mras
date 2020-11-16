@@ -31,18 +31,21 @@ class StateMachine:
         try:
             handler = self.handlers[self.startState]
         except:
-            raise InitializationError("must call .set_start() before .run()")
+            raise InitializationError('must call .set_start() before .run()')
         #if not self.endStates:
-        #    raise  InitializationError("at least one state must be an end_state")
+        #    raise  InitializationError('at least one state must be an end_state')
     
         while not rospy.is_shutdown():
+            
+            state_pub.Publish(newState)
             (newState, cargo) = handler(cargo)
             if newState.upper() in self.endStates:
-                print("reached ", newState)
+                print('reached ', newState)
                 break 
             else:
                 handler = self.handlers[newState.upper()]
             rospy.sleep(0.1)
+            
 
 #greendetection callback.
 green_detection = False
@@ -59,7 +62,7 @@ def callSprayService():
         callSpray = rospy.ServiceProxy('/thorvald_001/spray', Empty)
         return callSpray()
     except rospy.ServiceException, e:
-        print "Service call failed: %s" % e
+        print 'Service call failed: %s' % e
 
 #State machine states
 def launch(_):
@@ -67,15 +70,38 @@ def launch(_):
     return(newState,_)
 
 def roam(_):
+    """
+    In this state the robot moves to [random] positions until it finds green,
+    or detects a nearby collision object
+    """
     #publish a random target position
     target_position = Point()
     target_position_pub.publish(target_position)
     
-    if(green_detection == True):
-        newState = 'SPRAY'
+    if(False) #TODO add move_status subscriber and callback which parses for unexpected collision detection.
+        newState = 'PLAN'
+    elif(green_detection == True):
+        newState = 'GREENCLASSIFIER'
     else:
         newState = 'ROAM'
     return(newState,_)
+
+def plan(_):
+    """
+    #TODO plan route for robot considering collision objects.
+    """
+    newState = 'ROAM'
+    return(newState,_)
+
+def green_classifier(_):
+    """
+    TODO classification of detected green image.(Potentially combine this with the green detection.)
+    TODO add logic to decide whether to spray.
+    """
+    if(True):
+        newState = 'SPRAY'
+    return(newState,_)
+
 
 def spray(_):
     callSprayService()
@@ -88,20 +114,26 @@ thorvald_StateMachine = StateMachine()
 thorvald_StateMachine.add_state('LAUNCH',launch)
 thorvald_StateMachine.set_start('LAUNCH')
 thorvald_StateMachine.add_state('ROAM',roam)
+thorvald_StateMachine.add_state('PLAN',plan)
+thorvald_StateMachine.add_state('GREENCLASSIFIER',green_classifier)
 thorvald_StateMachine.add_state('SPRAY',spray)
 
-rospy.init_node("thorvald_state_machine",anonymous=True)
+
 
 if __name__ == '__main__':
     if(len(sys.argv)>1):
         robot_name = sys.argv[1]
         print(robot_name)
     else:
-        robot_name = "thorvald_001"
+        robot_name = 'thorvald_001'
 
-    green_detection_sub = rospy.Subscriber("/{}/green_detected".format(robot_name),String,green_detection_callback)
-    #target position publisher. The moving_thorvald node subscribes to these messages and the robot will navigate to them.
-    target_position_pub = rospy.Publisher("/{}/target_position".format(robot_name),Point,queue_size=0)
+    rospy.init_node('{}_state_machine'.format(robot_name),anonymous=True)
 
-    thorvald_StateMachine.run("")
+    green_detection_sub = rospy.Subscriber('/{}/green_detected'.format(robot_name),String,green_detection_callback)
+    
+    #target position publisher. The moving_thorvald node subscribes to these messages and the robot will navigate to the position given.
+    target_position_pub = rospy.Publisher('/{}/target_position'.format(robot_name),Point,queue_size=0)
+    state_pub = rospy.Publisher('/{}/state'.format(robot_name),String,queue_size=0)
+
+    thorvald_StateMachine.run('')
     

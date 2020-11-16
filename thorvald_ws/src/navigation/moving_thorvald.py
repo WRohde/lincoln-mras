@@ -27,6 +27,8 @@ class move:
         self.scan_sub = rospy.Subscriber("/{}/scan".format(robot_name), LaserScan, self.laserscan_subscriber_callback)
         self.odometry_sub = rospy.Subscriber("/{}/odometry/gazebo".format(robot_name),Odometry, self.odometry_subscriber_callback)
         self.target_sub = rospy.Subscriber("/{}/target_position".format(robot_name),Point,self.move_to_position)
+        self.state = ""
+        self.robot_state = rospy.Subscriber("/{}/state".format(robot_name),String,self.state_callback)
         self.transforms = tf.TransformListener()
         
         #publishers
@@ -90,6 +92,12 @@ class move:
         self.move_status = "MOVING"
         self.move_status_pub.publish(self.move_status)
         self.pub.publish(cmd_vel_message)
+
+    def state_callback(data):
+        """
+        Makes the state_machine state for the robot accessible to the rest of the class.
+        """        
+        self.state = data
 
     def odometry_subscriber_callback(self,data):
         """
