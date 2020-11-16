@@ -25,7 +25,6 @@ class move:
         
         #subscribers
         self.scan_sub = rospy.Subscriber("/{}/scan".format(robot_name), LaserScan, self.laserscan_subscriber_callback)
-        self.odometry_sub = rospy.Subscriber("/{}/odometry/gazebo".format(robot_name),Odometry, self.odometry_subscriber_callback)
         self.target_sub = rospy.Subscriber("/{}/target_position".format(robot_name),PoseStamped,self.move_to_position)
         self.state = ""
         self.robot_state = rospy.Subscriber("/{}/state".format(robot_name),String,self.state_callback)
@@ -33,18 +32,13 @@ class move:
         
         #publishers
         self.pub = rospy.Publisher("/{}/twist_mux/cmd_vel".format(robot_name),Twist,queue_size=0)
-        #move_status is used to control the behaviour of the robot. There are currently  
+        #move_status is used to communicate with the state_machine node. 
         self.move_status = ""
         self.move_status_pub = rospy.Publisher("/{}/move_status".format(robot_name),String,queue_size=0)
         #closest_collision message is a point indicating location of closest collision for Rviz
         self.publish_closest_collision = publish_closest_collision
         if (self.publish_closest_collision):
             self.closest_collision_publisher = rospy.Publisher("/{}/closest_collision".format(robot_name), PoseStamped,queue_size=0)
-
-        #defining some variables for use in later functions
-        self.detected_collisions = {"left":False,"right":False,"forward":False}
-        self.position = Pose()
-        self.rotation = Quaternion()
 
     def move_to_position(self,data):
         """
@@ -85,13 +79,6 @@ class move:
         Makes the state_machine state for the robot accessible to the rest of the class.
         """        
         self.state = data
-
-    def odometry_subscriber_callback(self,data):
-        """
-        Makes the odometry data accessible to the rest of the class.
-        """
-        self.position = data.pose.pose.position
-        self.rotation = data.pose.pose.orientation
 
     def laserscan_subscriber_callback(self,data):
         """
