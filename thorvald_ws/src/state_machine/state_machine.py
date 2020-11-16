@@ -3,7 +3,7 @@
 import rospy
 import sys
 import numpy as np
-from geometry_msgs.msg import Point
+from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import String
 from std_srvs.srv import Empty
 
@@ -74,7 +74,8 @@ def roam(_):
     or detects a nearby collision object
     """
     #publish a random target position
-    target_position = Point()
+    target_position = PoseStamped()
+    target_position.header.frame_id = '/{}/odom'.format(robot_name)
     target_position_pub.publish(target_position)
     
     if(False): #TODO add move_status subscriber and callback which parses for unexpected collision detection.
@@ -129,7 +130,7 @@ if __name__ == '__main__':
     green_detection_sub = rospy.Subscriber('/{}/green_detected'.format(robot_name),String,green_detection_callback)
     
     #target position publisher. The moving_thorvald node subscribes to these messages and the robot will navigate to the position given.
-    target_position_pub = rospy.Publisher('/{}/target_position'.format(robot_name),Point,queue_size=0)
+    target_position_pub = rospy.Publisher('/{}/target_position'.format(robot_name),PoseStamped,queue_size=0)
     state_pub = rospy.Publisher('/{}/state'.format(robot_name),String,queue_size=0)
 
     thorvald_StateMachine.run('')
