@@ -99,7 +99,7 @@ if __name__ == '__main__':
     else:
         robot_name = "thorvald_001"
 
-    green_detection_sub = rospy.Subscriber("/green_detected",String,green_detection_callback)
+    green_detection_sub = rospy.Subscriber("/{}/green_detected".format(robot_name),String,green_detection_callback)
     #target position publisher. The moving_thorvald node subscribes to these messages and the robot will navigate to them.
     target_position_pub = rospy.Publisher("/{}/target_position".format(robot_name),Point,queue_size=0)
 

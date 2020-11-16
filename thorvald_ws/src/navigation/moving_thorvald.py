@@ -6,10 +6,12 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 from geometry_msgs.msg import Twist, PoseStamped, Point, Quaternion
 from nav_msgs.msg import Odometry
+from std_msgs.msg import String
 from sensor_msgs.msg import LaserScan
+import tf
 
-class move_and_avoid:
-    def __init__(self,robot_name,min_distance=2,forward_speed=2,publish_closest_collision=True):
+class move:
+    def __init__(self,robot_name,min_distance=2,max_forward_speed=2,publish_closest_collision=True):
         """
         robot_name should be in the format "thorvald_001", "thorvald_002", etc so that topics are published correctly
         min_distance is the minimum distance between the robot and an obstacle before it turns to avoid.
@@ -17,16 +19,22 @@ class move_and_avoid:
 
         self.robot_name = robot_name
         self.min_distance = min_distance
-        self.forward_speed = forward_speed
+        self.max_forward_speed = max_forward_speed
 
         rospy.init_node("moving_"+robot_name,anonymous=True)
-        self.pub = rospy.Publisher("/{}/twist_mux/cmd_vel".format(robot_name),Twist,queue_size=0)
         
         #subscribers
         self.scan_sub = rospy.Subscriber("/{}/scan".format(robot_name), LaserScan, self.laserscan_subscriber_callback)
         self.odometry_sub = rospy.Subscriber("/{}/odometry/gazebo".format(robot_name),Odometry, self.odometry_subscriber_callback)
         self.target_sub = rospy.Subscriber("/{}/target_position".format(robot_name),Point,self.move_to_position)
+        self.transforms = tf.TransformListener()
         
+        #publishers
+        self.pub = rospy.Publisher("/{}/twist_mux/cmd_vel".format(robot_name),Twist,queue_size=0)
+        #move_status is used to control the behaviour of the robot. There are currently  
+        self.move_status = ""
+        self.move_status_pub = rospy.Publisher("/{}/move_status".format(robot_name),String,queue_size=0)
+        #closest_collision message is a pointer indicating location of closest collision for Rviz
         self.publish_closest_collision = publish_closest_collision
         if (self.publish_closest_collision):
             self.closest_collision_publisher = rospy.Publisher("/{}/closest_collision".format(robot_name), PoseStamped,queue_size=0)
@@ -43,61 +51,83 @@ class move_and_avoid:
         position_threshold = 0.1
         angular_threshold = 0.1
 
+        cmd_vel_message = Twist()
+        
         target_angle =  np.arctan2(target_position.y - self.position.y,target_position.x - self.position.x)
         current_angle = 2 * np.arccos(self.rotation.w)
         angular_error = target_angle - current_angle
         
-        #rotate so the target_position is in the forwards direction
-        if angular_error > angular_threshold:
-            angular_speed = min(angular_error, 1.5708)
-        elif angular_error < -angular_threshold:
-            angular_speed = max(angular_error, -1.5708)
-        else:
-            angular_speed = 0   
+        # #rotate so the target_position is in the forwards direction
+        # if abs(angular_error) > angular_threshold:
+        #      cmd_vel_message.angular.z = np.sign(angular_error) * min(angular_error, 1.5708)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
+        position_error = np.array([target_position.x - self.position.x, target_position.y - self.position.y,0,0])
 
-        position_error = ((target_position.x - self.position.x)**2 + (target_position.y - self.position.y)**2)**0.5
+        # TODO transform errors from world frame to robot frame.
+        # http://wiki.ros.org/tf/Tutorials/Writing%20a%20tf%20listener%20%28Python%29                                                                                           
+        try:
+            trans,rot = self.transforms.lookupTransform('/{}/odom'.format(robot_name), '/{}/base_link'.format(robot_name), rospy.Time(0))
+            trans,rot  = np.append(trans,0),np.array(rot)
+        except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+            return -1
+        
+        print("trans, ",trans)  
+        print("rot, ",rot)
+        print("test, ",position_error - trans)
 
-        #move to target and stop within threshold distance of it.
-        if abs(position_error) > position_threshold:
-            speed = min(position_error, self.forward_speed)
-        else:
-            speed = 0
+        rot_conjugate = np.array([rot[0],-rot[1],-rot[2],-rot[3]])
+        
+        position_error_base_link = rot * (position_error - trans) * rot_conjugate
+        print("error after transorm, ",position_error_base_link)
 
-        self.publish_cmd_vel(speed,angular_speed)
-    
+        #move to target in x and stop within threshold distance of it.
+        if abs(position_error[0]) > position_threshold:                                                                                                                                                                                                         
+            cmd_vel_message.linear.x = np.sign(position_error_base_link[0]) * min(abs(position_error_base_link[0]), self.max_forward_speed)
+        #if x is within threshold, move to target in y and stop within threshold distance of it.
+        if abs(position_error[1]) > position_threshold:
+            cmd_vel_message.linear.y = np.sign(position_error_base_link[1]) * min(abs(position_error_base_link[1]), self.max_forward_speed)
+
+        self.move_status = "MOVING"
+        self.move_status_pub.publish(self.move_status)
+        self.pub.publish(cmd_vel_message)
+
     def odometry_subscriber_callback(self,data):
         """
-        processes the odometry data
+        Makes the odometry data accessible to the rest of the class.
         """
         self.position = data.pose.pose.position
         self.rotation = data.pose.pose.orientation
 
     def laserscan_subscriber_callback(self,data):
         """
-        processes the laserscan data and checks for collisions
+        processes the laserscan data and checks for nearby collisions
 
         laserscan message type http://docs.ros.org/en/melodic/api/sensor_msgs/html/msg/LaserScan.html
         For the Thorvald Robot the laserscanner is positioned so that it sweeps from -pi/2 to pi/2
         """
-        self.check_collisions(data.ranges)
+
+        min_scan_distance = min(data.ranges)
+        if(min_scan_distance < self.min_distance):
+            self.move_status = "STATIONARY:COLLISION" 
+            self.move_status_pub.publish(self.move_status)
 
         if self.publish_closest_collision:
             #find the polar coord for the minimum distance
-            min_distance = min(data.ranges)
-            min_distance_angle = data.angle_increment * data.ranges.index(min_distance) - np.pi/2
+            min_scan_distance = min(data.ranges)
+            min_scan_distance_angle = data.angle_increment * data.ranges.index(min_scan_distance) - data.angle_min
 
             #convert to a pose WRT /robot_name/hokuyo frame
             pose = PoseStamped()
-            pose.header.frame_id = "{}/hokuyo".format(self.robot_name)
-            pose.pose.position.x = min_distance * np.cos(min_distance_angle)
-            pose.pose.position.y = min_distance * np.sin(min_distance_angle)
+            pose.header.frame_id = data.header.frame_id
+            pose.pose.position.x = min_scan_distance * np.cos(min_scan_distance_angle)
+            pose.pose.position.y = min_scan_distance * np.sin(min_scan_distance_angle)
             #convert angle to quaternion
-            r = Rotation.from_euler('z', min_distance_angle)
-            min_distance_quaternion = r.as_quat()
-            pose.pose.orientation.x = min_distance_quaternion[0]
-            pose.pose.orientation.y = min_distance_quaternion[1]
-            pose.pose.orientation.z = min_distance_quaternion[2]
-            pose.pose.orientation.w = min_distance_quaternion[3]
+            r = Rotation.from_euler('z', min_scan_distance_angle)
+            min_scan_distance_quaternion = r.as_quat()
+            pose.pose.orientation.x = min_scan_distance_quaternion[0]
+            pose.pose.orientation.y = min_scan_distance_quaternion[1]
+            pose.pose.orientation.z = min_scan_distance_quaternion[2]
+            pose.pose.orientation.w = min_scan_distance_quaternion[3]
 
             #publish pose
             self.closest_collision_publisher.publish(pose)
@@ -139,7 +169,7 @@ if __name__ == '__main__':
     else:
         robot_name = "thorvald_001"
     
-    move_and_avoid = move_and_avoid(robot_name)
+    move = move(robot_name)
     
     while not rospy.is_shutdown():
         rospy.sleep(0.1)

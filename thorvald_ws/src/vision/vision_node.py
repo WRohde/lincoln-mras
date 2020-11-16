@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import rospy
+import sys
 import numpy as np
 import cv2
 from std_msgs.msg import String
@@ -8,11 +9,11 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 
 class image_converter:
-    def __init__(self, image_topic = "/thorvald_001/kinect2_camera/hd/image_color_rect"):
-        self.image_pub = rospy.Publisher("opencv_image",Image,queue_size=0)
-        self.green_detected_pub = rospy.Publisher("green_detected",String,queue_size=0)
+    def __init__(self):
+        self.image_pub = rospy.Publisher("{}/opencv_image".format(robot_name),Image,queue_size=0)
+        self.green_detected_pub = rospy.Publisher("{}/green_detected".format(robot_name),String,queue_size=0)
+        self.image_sub = rospy.Subscriber("/{}/kinect2_camera/hd/image_color_rect".format(robot_name),Image,self.callback)
         self.bridge = CvBridge()
-        self.image_sub = rospy.Subscriber(image_topic,Image,self.callback)
 
     def callback(self,data):
         try:
@@ -48,6 +49,12 @@ class image_converter:
     
 
 if __name__ == '__main__':
+    if(len(sys.argv)>1):
+        robot_name = sys.argv[1]
+        print(robot_name)
+    else:
+        robot_name = "thorvald_001"
+
     ic = image_converter()
     rospy.init_node('vision_node', anonymous=True)
     rospy.spin()
