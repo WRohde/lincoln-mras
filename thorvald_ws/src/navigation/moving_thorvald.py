@@ -33,23 +33,27 @@ class move:
         #publishers
         self.pub = rospy.Publisher("/{}/twist_mux/cmd_vel".format(robot_name),Twist,queue_size=0)
         #move_status is used to communicate with the state_machine node. 
-        self.move_status = ""
+        self.move_status = "WAITINGFORTARGET"
         self.move_status_pub = rospy.Publisher("/{}/move_status".format(robot_name),String,queue_size=0)
+        self.move_status_pub.publish(self.move_status)
         #closest_collision message is a point indicating location of closest collision for Rviz
         self.publish_closest_collision = publish_closest_collision
         if (self.publish_closest_collision):
             self.closest_collision_publisher = rospy.Publisher("/{}/closest_collision".format(robot_name), PoseStamped,queue_size=0)
 
+    def __call__(self):
+        while not rospy.is_shutdown():
+            self.move_status_pub.publish(self.move_status)
+            rospy.sleep(0.1)
+
     def move_to_position(self,data):
         """
         This function will attempt to move the robot to within a threshold of a posestamped position and stop there.
-        The position shoi
         """        
-
         position_threshold = 0.1
         angular_threshold = np.pi/8
-
         cmd_vel_message = Twist()
+        at_goal_flag_x,at_goal_flag_y = False,False
         
         # transform errors from world frame to robot frame.
         # http://wiki.ros.org/tf/Tutorials/Writing%20a%20tf%20listener%20%28Python%29                                                                                           
@@ -63,7 +67,7 @@ class move:
             return -1 #TODO find a better way of doing this.
         
         # #rotate so the target_position is in the forwards direction, trying to minimise arctan2 = 0
-        # #this does not work well disabled for now, TODO prevent this from spinning at target and wobbling while driving. 
+        # #this does not work well disabled for now, TODO prevent this from spinning when at target and wobbling while driving. 
         # angular_error = np.arctan2(position_error_WRT_base[1],position_error_WRT_base[0])
         # if abs(angular_error) > angular_threshold:
         #     cmd_vel_message.angular.z = -np.sign(angular_error) * min(abs(angular_error),np.pi/8)
@@ -71,13 +75,20 @@ class move:
         #move to target in x and stop within threshold distance of it.
         if abs(position_error_WRT_base[0]) > position_threshold:                                                                                                                                                                                                         
             cmd_vel_message.linear.x = np.sign(position_error_WRT_base[0]) * min(abs(position_error_WRT_base[0]), self.max_forward_speed)
+        else: at_goal_flag_x = True
         #move to target in y and stop within threshold distance of it.
         if abs(position_error_WRT_base[1]) > position_threshold:
             cmd_vel_message.linear.y = np.sign(position_error_WRT_base[1]) * min(abs(position_error_WRT_base[1]), self.max_forward_speed)
+        else: at_goal_flag_y = True
 
-        self.move_status = "MOVING"
-        self.move_status_pub.publish(self.move_status)
         self.pub.publish(cmd_vel_message)
+
+        #check if the robot is at the target_position and inform the state machine.
+        if at_goal_flag_x and at_goal_flag_y and True:
+            self.move_status = "ATGOAL"
+        else:
+            self.move_status = "MOVING"
+        self.move_status_pub.publish(self.move_status)
 
     def state_callback(self,data):
         """
@@ -95,8 +106,10 @@ class move:
 
         min_scan_distance = min(data.ranges)
         if(min_scan_distance < self.min_distance):
-            self.move_status = "STATIONARY:COLLISION" 
+            self.move_status = "COLLISION" 
             self.move_status_pub.publish(self.move_status)
+        elif self.move_status == "COLLISION":
+            self.move_status = "MOVING" 
 
         if self.publish_closest_collision:
             #find the polar coord for the minimum distance
@@ -127,6 +140,6 @@ if __name__ == '__main__':
     
     move = move(robot_name)
     
-    while not rospy.is_shutdown():
-        rospy.sleep(0.1)
+    move()
+
 

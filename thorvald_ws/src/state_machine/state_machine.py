@@ -3,7 +3,7 @@
 import rospy
 import sys
 import numpy as np
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Point
 from std_msgs.msg import String
 from std_srvs.srv import Empty
 
@@ -46,6 +46,11 @@ class StateMachine:
             rospy.sleep(0.1)
             
 
+#the target_position_list is a list of waypoints for the robot to navigate to.
+#TODO generate the list autonomously
+target_position_list = [[8,-8,0],[8,8,0],[5,-8,0],[5,8,0],[0,-8,0],[0,8,0],[-5,-8,0],[-5,8,0],[-8,8,0],[-8,-8,0]]
+current_target = []
+
 #greendetection callback.
 green_detection = False
 def green_detection_callback(data):
@@ -54,6 +59,12 @@ def green_detection_callback(data):
         green_detection = True
     else:
         green_detection = False 
+
+#move_status callback
+move_status = ""
+def move_status_callback(data):
+    global move_status
+    move_status = data.data
 
 def callSprayService():
     rospy.wait_for_service('/thorvald_001/spray')
@@ -70,15 +81,25 @@ def launch(_):
 
 def roam(_):
     """
-    In this state the robot moves to [random] positions until it finds green,
-    or detects a nearby collision object
+    In this state the robot moves to positions from a list until it finds green in which case the system
+    will transition to the GREENCLASSIFIER state, or detects a nearby collision object (in which case the
+    system will transition to the PLAN state. 
     """
-    #publish a random target position
+    global current_target
+    global target_position_list
+    
     target_position = PoseStamped()
     target_position.header.frame_id = '/{}/odom'.format(robot_name)
-    target_position_pub.publish(target_position)
+    if (move_status == 'WAITINGFORTARGET' or (move_status == 'ATGOAL'and len(target_position_list)>0)):
+        current_target = target_position_list.pop(0)
+        target_position.pose.position = Point(current_target[0],current_target[1],current_target[2])
+        target_position_pub.publish(target_position)
+    elif move_status == 'MOVING':
+        target_position.pose.position = Point(current_target[0],current_target[1],current_target[2])
+        target_position_pub.publish(target_position)
     
-    if(False): #TODO add move_status subscriber and callback which parses for unexpected collision detection.
+    #new state selection. 
+    if(move_status == 'COLLISION'):
         newState = 'PLAN'
     elif(green_detection == True):
         newState = 'GREENCLASSIFIER'
@@ -127,7 +148,9 @@ if __name__ == '__main__':
 
     rospy.init_node('{}_state_machine'.format(robot_name),anonymous=True)
 
+    #subscribers
     green_detection_sub = rospy.Subscriber('/{}/green_detected'.format(robot_name),String,green_detection_callback)
+    move_status_sub = rospy.Subscriber("/{}/move_status".format(robot_name),String,move_status_callback)
     
     #target position publisher. The moving_thorvald node subscribes to these messages and the robot will navigate to the position given.
     target_position_pub = rospy.Publisher('/{}/target_position'.format(robot_name),PoseStamped,queue_size=0)
