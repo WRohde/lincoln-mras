@@ -45,7 +45,6 @@ class StateMachine:
                 handler = self.handlers[newState.upper()]
             rospy.sleep(0.1)
             
-
 #the target_position_list is a list of waypoints for the robot to navigate to.
 #TODO generate the list autonomously
 target_position_list = [[8,-8,0],[8,8,0],[5,-8,0],[5,8,0],[0,-8,0],[0,8,0],[-5,-8,0],[-5,8,0],[-8,8,0],[-8,-8,0]]

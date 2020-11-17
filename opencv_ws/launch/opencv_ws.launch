@@ -1,0 +1,11 @@
+<launch>
+    <include file="$(find video_stream_opencv)/launch/camera.launch">
+        <arg name="video_stream_provider" value="/dev/video0" />
+        <arg name="camera_name" value="camera" /> 
+        <arg name = "visualize" value="true" />
+    </include>
+
+    <node pkg="webcam_pkg" type="camera_cv.py" name="camera_cv" />
+    <node pkg="opencv_apps" type="face_detection" name="face_detection" args="image:=/camera/image_raw" />
+
+</launch>
