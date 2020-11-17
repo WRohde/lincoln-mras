@@ -42,11 +42,12 @@ class move:
 
     def move_to_position(self,data):
         """
-        this function will attempt to move the robot to within a threshold of a given position and stop there.
+        This function will attempt to move the robot to within a threshold of a posestamped position and stop there.
+        The position shoi
         """        
 
         position_threshold = 0.1
-        angular_threshold = 0.1
+        angular_threshold = np.pi/8
 
         cmd_vel_message = Twist()
         
@@ -54,19 +55,23 @@ class move:
         # http://wiki.ros.org/tf/Tutorials/Writing%20a%20tf%20listener%20%28Python%29                                                                                           
         try:
             self.transforms.waitForTransform('/{}/base_link'.format(robot_name), data.header.frame_id,rospy.Time(),rospy.Duration(0.5))
-            target_position_WRT_base = self.transforms.transformPose('/{}/base_link'.format(robot_name), data)
-            position_error_WRT_base = np.array([target_position_WRT_base.pose.position.x,\
-                    target_position_WRT_base.pose.position.y,\
-                    target_position_WRT_base.pose.position.z])
+            target_pose_WRT_base = self.transforms.transformPose('/{}/base_link'.format(robot_name), data)
+            position_error_WRT_base = np.array([target_pose_WRT_base.pose.position.x,\
+                    target_pose_WRT_base.pose.position.y,\
+                    target_pose_WRT_base.pose.position.z])
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-            return -1
+            return -1 #TODO find a better way of doing this.
         
-        #TODO rotate so the target_position is in the forwards direction
+        # #rotate so the target_position is in the forwards direction, trying to minimise arctan2 = 0
+        # #this does not work well disabled for now, TODO prevent this from spinning at target and wobbling while driving. 
+        # angular_error = np.arctan2(position_error_WRT_base[1],position_error_WRT_base[0])
+        # if abs(angular_error) > angular_threshold:
+        #     cmd_vel_message.angular.z = -np.sign(angular_error) * min(abs(angular_error),np.pi/8)
 
         #move to target in x and stop within threshold distance of it.
         if abs(position_error_WRT_base[0]) > position_threshold:                                                                                                                                                                                                         
             cmd_vel_message.linear.x = np.sign(position_error_WRT_base[0]) * min(abs(position_error_WRT_base[0]), self.max_forward_speed)
-        #if x is within threshold, move to target in y and stop within threshold distance of it.
+        #move to target in y and stop within threshold distance of it.
         if abs(position_error_WRT_base[1]) > position_threshold:
             cmd_vel_message.linear.y = np.sign(position_error_WRT_base[1]) * min(abs(position_error_WRT_base[1]), self.max_forward_speed)
 
